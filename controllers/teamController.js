@@ -50,17 +50,20 @@ exports.UpdateTeam = async (req, res) => {
     const {  description, managerId } = req.body;
     try {
         let errors = []
+        let dbChecks = [];
         let existingUser = await User.User.findOne({_id:managerId});
         if (!existingUser) {
-            errors.push( "User not found" );
+            dbChecks.push( "User not found" );
         } 
         const team = await Team.findOneAndUpdate(
          { uid: uidTeam }, 
         { $set:{description, manager: managerId}}, 
          { new: true });
         if (!team) {
-            errors.push('Team not found')
+            dbChecks.push('Team not found')
         }
+        const checkResults = await Promise.all(dbChecks)
+        errors = errors.concat(checkResults.filter((result) => result !== null))
         if (errors.length > 0) {
             return res.status(400).json({ errors })
         }

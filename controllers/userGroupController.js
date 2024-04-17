@@ -85,16 +85,18 @@ exports.AddAuthorityToUserGroup = async (req, res) => {
         let existingAuthority = await Authority.findOne({ uid: authorityUid })
 
         if (!existingAuthority) {
-            errors.push('Authority does not exist');
+            dbChecks.push('Authority does not exist');
         }
 
         const userGroup = await UserGroup.findOne({ uid: uidUserGroup })
-        if (!userGroup) errors.push("UserGroup not found")
-
+        if (!userGroup) dbChecks.push("UserGroup not found")
+         if(userGroup && existingAuthority){
         const authorityExists = userGroup.groupAuthorities.some(authority => authority.equals(existingAuthority._id));
         if (authorityExists) {
           errors.push('Authority already exists for this user group');}
           userGroup.groupAuthorities.push(existingAuthority);
+
+        }
         const checkResults = await Promise.all(dbChecks);
         errors = errors.concat(checkResults.filter((result) => result !== null));
     
@@ -113,11 +115,20 @@ exports.AddAuthorityToUserGroup = async (req, res) => {
     const uidUserGroup = req.params.uid;
     const uidAuthority = req.body.uid;
     let errors = [];
+    let dbChecks = [];
     try {
         const userGroup = await UserGroup.findOne({ uid: uidUserGroup })
-        if (!userGroup) errors.push("UserGroup not found.")
+        if (!userGroup) dbChecks.push("UserGroup not found.")
         const authority = await Authority.findOne({ uid: uidAuthority })
-        if (!authority) errors.push("Authority not found.")
+        if (!authority) dbChecks.push("Authority not found.")
+        
+        if(userGroup && authority){
+        const authorityExists = userGroup.groupAuthorities.some(authority => authority.equals(authority._id));
+        if (!authorityExists) {
+          dbChecks.push('Authority does not exist for this user group');}
+        }
+        const checkResults = await Promise.all(dbChecks)
+        errors = errors.concat(checkResults.filter((result) => result !== null))
         if (errors.length > 0) return res.status(400).json({ errors })
         
     userGroup.groupAuthorities.pull(authority._id);
@@ -133,17 +144,26 @@ exports.AddAuthorityToUserGroup = async (req, res) => {
     const uidUserGroup = req.params.uid
     const uidDAAQ = req.body.uid;
     let errors = [];
+    let dbChecks = [];
     try {
      
       const userGroup = await UserGroup.findOne({
         uid: uidUserGroup,
       });
-      if (!userGroup) errors.push("UserGroup not found");
+      if (!userGroup) dbChecks.push("UserGroup not found");
 
       const daaq= await DAAQ.findOne({
         uid: uidDAAQ
       });
-      if(!daaq) errors.push("DAAQ not found");
+      if(!daaq) dbChecks.push("DAAQ not found");
+      if(userGroup && daaq){
+      const daaqExists = userGroup.grouupDAAQs.some(daaqq => daaqq.equals(daaq._id));
+      if (daaqExists) {
+        errors.push('DAAQ already exists for this user group');
+    }
+    }
+      const checkResults = await Promise.all(dbChecks);
+      errors = errors.concat(checkResults.filter((result) => result !== null));
       if (errors.length > 0) return res.status(400).json({ errors });
   
       userGroup.grouupDAAQs.push(daaq);
@@ -163,13 +183,22 @@ exports.RemoveDAAQFromUserGroup = async (req, res) => {
     const uidUserGroup = req.params.uid;
     const uidDAAQ = req.body.uid;
     let errors = [];
+    let dbChecks=[];
     try {
         const userGroup = await UserGroup.findOne({ uid: uidUserGroup })
-        if (!userGroup) errors.push("UserGroup not found.")
+        if (!userGroup) dbChecks.push("UserGroup not found.")
         const daaq = await DAAQ.findOne({ uid: uidDAAQ })
-        if (!daaq) errors.push("DAAQ not found.")
-        if (errors.length > 0) return res.status(400).json({ errors })
-        
+        if (!daaq) dbChecks.push("DAAQ not found.")
+        if(userGroup && daaq){
+        const daaqExists = userGroup.grouupDAAQs.some(daaqq => daaqq.equals(daaq._id));
+        if (!daaqExists) {
+            dbChecks.push('DAAQ does not exist for this user group');}
+        }
+        const checkResults = await Promise.all(dbChecks)
+        errors = errors.concat(checkResults.filter((result) => result !== null))
+
+    if (errors.length > 0) return res.status(400).json({ errors })
+
     userGroup.grouupDAAQs.pull(daaq._id);
     await userGroup.save();
     res.status(200).json({ message: "DAAQ deleted successfully from UserGroup" });

@@ -176,7 +176,7 @@ exports.LoginUser = async (req, res) => {
       return res.status(400).json({ errors })
     }
     const token = jwt.sign(
-      { userUid: user.uid, username: user.username},
+      { userId: user._id, username: user.username},
       process.env.JWT_SECRET_KEY,
       { expiresIn: "1h" }
     );
@@ -234,22 +234,24 @@ exports.AddAuthorityToUser = async (req, res) => {
     let existingAuthority = await Authority.findOne({ uid:authorityUid });
 
     if (!existingAuthority) {
-        errors.push('Authority does not exist');
+      dbChecks.push('Authority does not exist');
     }
 
     const user = await User.findOne({
       _id: idUser,
     });
-    if (!user) errors.push("User not found");
+    if (!user) dbChecks.push("User not found");
+    if (existingAuthority && user) {
     const authorityExists = user.personalAuthorities.some(authority => authority.equals(existingAuthority._id));
     if (authorityExists) {
-      errors.push('Authority already exists for this user');}
+      dbChecks.push('Authority already exists for this user');}}
+      const checkResults = await Promise.all(dbChecks);    
+      errors = errors.concat(checkResults.filter((result) => result !== null));
+  
+      if (errors.length > 0) return res.status(400).json({ errors });
+  
     user.personalAuthorities.push(existingAuthority);
-    const checkResults = await Promise.all(dbChecks);
-    errors = errors.concat(checkResults.filter((result) => result !== null));
-
-    if (errors.length > 0) return res.status(400).json({ errors });
-
+  
     await Promise.all([existingAuthority.save(), user.save()]);
 
     res.status(200).json({ user });
@@ -265,14 +267,20 @@ exports.RemoveAuthorityFromUser = async (req, res) => {
   const uidAuthority  = req.body.uid;
 
   let errors = [];
+  let dbChecks = [];
   try {
     const user = await User.findOne({ _id: idUser});
     if (!user)
-      errors.push("User not found." );
+    dbChecks.push("User not found." );
     const authority = await Authority.findOne({ uid: uidAuthority });
     if (!authority)
-      errors.push("Authority not found.");
-
+    dbChecks.push("Authority not found.");
+    if (user && authority) {
+    const authorityExists = user.personalAuthorities.some(authorityy => authorityy.equals(authority._id));
+    if (!authorityExists) {
+      dbChecks.push('Authority does not exist for this user');}}
+    const checkResults = await Promise.all(dbChecks)
+    errors = errors.concat(checkResults.filter((result) => result !== null))
     if (errors.length > 0) {
       return res.status(400).json({ errors });
     }
@@ -292,16 +300,25 @@ exports.RemoveAuthorityFromUser = async (req, res) => {
   const idUser = req.params.id
   const uidDAAQ = req.body.uid;
   let errors = [];
+  let dbChecks = [];
   try {
    
     const user = await User.findOne({
       _id: idUser,
     });
-    if (!user) errors.push("User not found");
+    if (!user) dbChecks.push("User not found");
     const daaq= await DAAQ.findOne({
       uid: uidDAAQ
     });
-    if(!daaq) errors.push("DAAQ not found");
+    if(!daaq) dbChecks.push("DAAQ not found");
+    if (daaq && user) {
+      const daaqExists = user.personalDAAQs.some(daaqq => daaqq.equals(daaq._id));
+      if (daaqExists) {
+        dbChecks.push('DAAQ already exists for this user');
+      }
+      }
+    const checkResults = await Promise.all(dbChecks)
+    errors = errors.concat(checkResults.filter((result) => result !== null))
     if (errors.length > 0) return res.status(400).json({ errors });
 
     user.personalDAAQs.push(daaq);
@@ -320,13 +337,22 @@ exports.RemoveDAAQFromUser = async (req, res) => {
   const uidDAAQ  = req.body.uid;
 
   let errors = [];
+  let dbChecks = [];
   try {
     const user = await User.findOne({ _id: idUser});
     if (!user)
-      errors.push("User not found." );
+    dbChecks.push("User not found." );
     const daaq = await DAAQ.findOne({ uid: uidDAAQ });
     if (!daaq)
-      errors.push("DAAQ not found.");
+    dbChecks.push("DAAQ not found.");
+    
+    if( daaq && user) {
+      if (user.personalDAAQs.every(daaqq => !daaqq.equals(daaq._id)))
+      dbChecks.push('The DAAQ is not associated to this user');
+    }
+   
+    const checkResults = await Promise.all(dbChecks)
+    errors = errors.concat(checkResults.filter((result) => result !== null))
 
     if (errors.length > 0) {
       return res.status(400).json({ errors });
